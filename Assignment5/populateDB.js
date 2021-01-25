@@ -6,91 +6,94 @@ const snacksDB = new sqlite3.Database('./snacksDB.sqlite');
 async function load() 
 {
     console.log('calling load');
-    const restaurantFile = ('./restaurants.json'); //save the path to the JSON file in the variable restaurantFile;
-    const buffer = await fsp.readFile(restaurantFile); //call the readFile method from the fsp module and wait for that to load before the next step
+    const buffer = await fsp.readFile('./restaurants.json'); //call the readFile method from the fsp module and wait for that to load before the next step
     const restaurants = (JSON.parse(String(buffer))); //Make the content JS and save in a variable
-    return restaurants; //return the array
-}
+    console.log(restaurants);
 
-try 
-{
-    snacksDB.serialize(function ()
+    try 
     {
-        /*Insert rows for the restaurants table */
-
-        const restaurants = load();
-        //console.log(restaurants);
-
-        let stmt;
-        
-        try 
+        snacksDB.serialize(function ()
         {
-            stmt = snacksDB.prepare(`INSERT INTO Restaurants (name, imagelink) VALUES (?, ?)`);
+            /*Insert rows for the restaurants table */
 
-            for (i=0; i < restaurants.length; i++)
+            let stmt;
+            
+            try 
             {
-                stmt.run(restaurants[i].name, restaurants[i].image);
+                stmt = snacksDB.prepare(`INSERT INTO Restaurants (name, imagelink) VALUES (?, ?)`);
+
+                for (let i=0; i < restaurants.length; i++)
+                {
+                    console.log("Hello banana");
+                    stmt.run(restaurants[i].name, restaurants[i].image);
+                }
+
+            } finally //runs regardless of whether there was an error above
+            { 
+                stmt.finalize(); //closes the statement and releases resources
+            };
+
+            
+            // /*Insert rows for Menu table */
+
+            let stmt2 = snacksDB.prepare("INSERT INTO Menus_ATW (restaurant_id, title) VALUES (?,?)");
+
+            for (let i = 0; i < restaurants.length; i++)
+            {
+                let R_index = i+1;
+
+                for (let j=0; j < restaurants[i].menus.length; j++)
+                {
+                    stmt2.run(R_index, restaurants[i].menus[j].title);
+                }
             }
 
-        } finally //runs regardless of whether there was an error above
-        { 
-            stmt.finalize(); //closes the statement and releases resources
-        };
+            stmt2.finalize();
 
-        
-        // /*Insert rows for Menu table */
+            // /*Insert rows for the Menu Items table */
 
-        let stmt2 = snacksDB.prepare("INSERT INTO Menus_ATW (restaurant_id, title) VALUES (?,?)");
+            let stmt3 = snacksDB.prepare('INSERT INTO Menu_Items (menu_id, name, price) VALUES (?, ?, ?)');
 
-        for (let i = 0; i < restaurants.length; i++)
-        {
-            let R_index = i;
-            for (i=0; i < restaurants[i].menus.length; i++)
+            for (let i=0; i < restaurants.length; i++)
+            {
+                for (let j=0; j < restaurants[i].menus.length; j++)
                 {
-                    stmt2.run(R_index, restaurants[i].menus[i].title);
+                    M_index = j+1; 
+                    for (let k=0; k < restaurants[i].menus[j].items.length; k++)
+                    {
+                        stmt3.run(M_index, restaurants[i].menus[j].items[k].name, restaurants[i].menus[j].items[k].price);
+                    }
                 }
-        }
+            }
 
-        stmt2.finalize();
+            stmt3.finalize();
 
-        // /*Insert rows for the Menu Items table */
+            // /*Join the menus and restaurants tables */
 
-        // let stmt3 = snacksDB.prepare('INSERT INTO Menu_Items (menu_id, name, price) VALUES (?, ?, ?)');
+            // snacksDB.each("SELECT * FROM Restaurants JOIN Menus_ATW ON Restaurants.id = Menus_ATW.restaurant_id"),
+            //     function (err, rows) {  // this is a callback function
+            //         console.log(rows);  // rows contains the matching rows
+            //     }
+            
+        });
 
-        // for (i=0, i < restaurants.length; i++)
-        // {
-        //     for (i=0; i < restaurants[i].menus.length; i++)
-        //     {
-        //         M_index = i; 
-        //         for (i=0; i < restaurants[i].menus.items.length i++)
-        //         {
-        //             stmt3.run(M_index, restaurants[i].menus[i].items[i].name, restaurants[i].menus[i].items[i].price);
-        //         }
-        //     }
-        // }
+    } finally 
+    { 
+        console.log("Populating the DB worked!");
+        snacksDB.close((err) => 
+        {
+            if (err) {
+            return console.error(err.message);
+            }
+            console.log('Closed the database connection.');
+        });
 
-        // stmt3.finalize();
+    }
+
+}
+
+load();
 
 
-        // /*Join the menus and restaurants tables */
 
-        // snacksDB.each("SELECT * FROM Restaurants JOIN Menus_ATW ON Restaurants.id = Menus_ATW.restaurant_id"),
-        //     function (err, rows) {  // this is a callback function
-        //         console.log(rows);  // rows contains the matching rows
-        //     }
-        
-
-    });
-
-} finally { 
-    console.log("Populating the DB worked!");
-    snacksDB.close((err) => 
-    {
-        if (err) {
-          return console.error(err.message);
-        }
-        console.log('Closed the database connection.');
-    });
-
-} 
 
